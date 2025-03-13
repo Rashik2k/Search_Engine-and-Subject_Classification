@@ -14,8 +14,7 @@ nltk.download('wordnet')
 nltk.download('omw-1.4')
 lemmatizer = nltk.WordNetLemmatizer()
 
-
-# Constants
+# Constants - Define key file paths and URLs
 BASE_URL = "https://pureportal.coventry.ac.uk/"
 DATA_FILE = "publications.json"
 INDEX_FILE = "inverted_index.json"
@@ -23,30 +22,20 @@ MODEL_FILE = "text_clf.sav"
 VECTORIZER_FILE = "text__vectorizer.sav"
 TRAIN_SCRIPT = "model_train.py"
 
-
-
-@st.cache_resource
+@st.cache_resource  # Cache model loading to optimize performance
 def load_model():
-    if not os.path.exists(MODEL_FILE) or not os.path.exists(VECTORIZER_FILE):
+    if not all(os.path.exists(f) for f in [MODEL_FILE, VECTORIZER_FILE]):
         print("Model files not found. Training model...")
         subprocess.run([sys.executable, TRAIN_SCRIPT], check=True)
-
-    with open(MODEL_FILE, 'rb') as model_file:
-        model = pickle.load(model_file)
     
-    with open(VECTORIZER_FILE, 'rb') as vectorizer_file:
-        vectorizer = pickle.load(vectorizer_file)
-    
-    return model, vectorizer
+    with open(MODEL_FILE, 'rb') as model_file, open(VECTORIZER_FILE, 'rb') as vectorizer_file:
+        return pickle.load(model_file), pickle.load(vectorizer_file)
 
-
-# Initialize components
-@st.cache_resource
+@st.cache_resource  # Cache initialization for efficiency
 def initialize_components():
     crawler = Crawler(BASE_URL, data_file=DATA_FILE)
     crawler.load_data()
 
-    # Only crawl if no existing data is found
     if not crawler.publications:
         st.write("No existing data found. Starting crawl...")
         crawler.crawl_publications()
@@ -54,56 +43,36 @@ def initialize_components():
     indexer = Indexer(crawler.publications, index_file=INDEX_FILE)
     indexer.load_index()
 
-    # Only build index if no existing index is found
     if not indexer.inverted_index:
         st.write("No existing index found. Building index...")
         indexer.build_index()
 
-    query_processor = QueryProcessor(crawler.publications, indexer.inverted_index)
-    return query_processor
-
+    return QueryProcessor(crawler.publications, indexer.inverted_index)
 
 # Function to preprocess text
 def text_tokenize_lemmatize(text):
-    text = re.sub('[^a-zA-Z]', ' ', text)
-    lower_text = text.lower()
-    tokenizer = nltk.tokenize.WhitespaceTokenizer()
-    tokenized = tokenizer.tokenize(lower_text)
-    lemmatized_output = ' '.join([lemmatizer.lemmatize(w) for w in tokenized])
-    return lemmatized_output
+    text = re.sub(r'[^a-zA-Z]', ' ', text).lower()
+    return ' '.join(lemmatizer.lemmatize(w) for w in nltk.tokenize.WhitespaceTokenizer().tokenize(text))
 
-
-# Streamlit app
-
+# Streamlit App
 def main():
-    # Display the Coventry University logo
-    st.image("coventry_logo.png", use_column_width=True)  
-
-    # Sidebar navigation menu
-    menu = ["Search Publications", "Text Classification"]
+    st.image("coventry_logo.png", use_container_width=True)
+    menu = ["Search Publications", "Subject Classification"]
     choice = st.sidebar.radio("Select an Option", menu)
 
     if choice == "Search Publications":
         st.title("Coventry University Publications Search Engine")
         st.subheader("Find publications by faculty members")
-
-        # Initialize components
         query_processor = initialize_components()
-
-        # Search input
-        st.markdown("### Search for Publications")
+        
         query = st.text_input("Enter your search query:", placeholder="e.g. Accounting, Economics, Finance, Business...")
 
         if query:
-            # Perform search
             relevant_docs = query_processor.search(query)
-
-            # Display results
             if relevant_docs:
                 st.write(f"Found {len(relevant_docs)} relevant publications:")
                 for doc_id, score in relevant_docs:
                     pub = query_processor.publications[doc_id]
-
                     with st.expander(pub['title']):
                         st.write(f"**Authors:** {', '.join(author['name'] for author in pub['authors'])}")
                         st.write(f"**Year:** {pub['publication_year']}")
@@ -113,26 +82,20 @@ def main():
             else:
                 st.write("No relevant publications found. Try a different query.")
 
-    elif choice == "Text Classification":
-        st.title("Text Classification")
+    elif choice == "Subject Classification":
+        st.title("Subject Classification")
         st.subheader("Classify text into: Business, Health, or Politics")
-
         model, vectorizer = load_model()
-
-        # Input text area
         input_text = st.text_area("Enter text to classify:", height=150, placeholder="Type or paste your text here...")
+        classify_button = st.button("Classify Text")
 
-        # Centering the button
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button("Classify Text"):
-                if input_text:
-                    processed_text = text_tokenize_lemmatize(input_text)
-                    vectorized_text = vectorizer.transform([processed_text])
-                    predicted_classification = model.predict(vectorized_text)[0]
-                    st.write(f"The text belongs to: **{predicted_classification}**")
-                else:
-                    st.write("Please enter some text to classify.")
+        if classify_button:
+            if input_text:
+                processed_text = text_tokenize_lemmatize(input_text)
+                predicted_classification = model.predict(vectorizer.transform([processed_text]))[0]
+                st.write(f"The text belongs to: **{predicted_classification}**")
+            else:
+                st.write("Please enter some text to classify.")
 
 if __name__ == "__main__":
     main()
