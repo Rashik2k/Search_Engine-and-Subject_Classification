@@ -9,13 +9,9 @@ This task involves creating a document classification system that can categorize
 
 #### **File Structure**
 ```
-├── crawler.py          # Handles crawling and data extraction
-├── indexer.py          # Builds and manages the inverted index
-├── query_processor.py  # Processes user queries and displays results
-├── utils.py            # Utility functions (e.g., text preprocessing)
-├── selenium_setup.py   # Selenium web driver setup for web scraping
-├── model_train.py      # Trains the Multinomial NB with the available dataset
-├── app.py              # Streamlit app, main script to run the search engine and text classification based on three Categories: Politics, Business and Health
+├── requisite.py          # Handles crawling and indexing of data
+├── classification.ipynb  #Trains the Multinomial NB with the available dataset
+├── app.py                # uses flask to show the UI in a website, main script to run the search engine and text classification based on three Categories:                                     Politics, Business and Health
 ```
 
 
@@ -24,11 +20,15 @@ This task involves creating a document classification system that can categorize
    ```bash
    git clone https://github.com/Rashik2k/Search_Engine-and-Subject_Classification.git
    ```
-2. **Install the required dependencies**:
+2. **Install libraries from requirements.txt**:
    ```bash
    pip install -r requirements.txt
    ```
-3. **Run the application**:
+3. **If we need to do a clean run from beginning then**
+   - First delete inverted_index.json, publications.json, classifier.sav, vectorizer.sav files
+   - Then run python requisite.py
+   - Then run each cells from jupyter notebook i.e Classification.ipynb
+3. **Run the application in website**:
    ```bash
-   streamlit run app.py
+   python app.py
    ```
